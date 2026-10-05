@@ -90,6 +90,16 @@ export async function updateCartItem(userId: string, line: CartLine, quantity: n
 }
 
 export async function removeCartItem(userId: string, line: CartLine) {
-  const { error } = await supabase.from('cart_items').delete().in('id', line.rowIds).eq('user_id', userId);
+  const rowIds = Array.from(new Set(line.rowIds.length ? line.rowIds : [line.id]));
+  const { data: deletedRows, error } = await supabase.from('cart_items').delete()
+    .in('id', rowIds).eq('user_id', userId).select('id');
   if (error) throw error;
+  const deletedIds = new Set((deletedRows || []).map((row) => row.id));
+  const possiblyRemaining = rowIds.filter((id) => !deletedIds.has(id));
+  if (possiblyRemaining.length) {
+    const { data: remainingRows, error: verifyError } = await supabase.from('cart_items')
+      .select('id').in('id', possiblyRemaining).eq('user_id', userId);
+    if (verifyError) throw verifyError;
+    if (remainingRows?.length) throw new Error('The cart item could not be removed. Please refresh and try again.');
+  }
 }

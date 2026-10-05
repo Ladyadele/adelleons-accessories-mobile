@@ -38,15 +38,22 @@ export async function loadProducts(): Promise<Product[]> {
 
 export function productImageUri(path?: string): string | undefined {
   if (!path) return undefined;
-  if (/^https?:\/\//i.test(path)) return new URL(path).toString();
+  if (/^https?:\/\//i.test(path)) return path;
 
-  let origin = process.env.EXPO_PUBLIC_SITE_URL || 'https://adelleons.com';
+  const productionOrigin = 'https://adelleons-accessories.vercel.app';
+  let origin = process.env.EXPO_PUBLIC_SITE_URL || productionOrigin;
   if (__DEV__ && Platform.OS === 'web' && typeof window !== 'undefined') {
     origin = `http://${window.location.hostname}:3000`;
   } else if (__DEV__ && Platform.OS !== 'web') {
     const developmentHost = Constants.expoConfig?.hostUri?.split(':')[0];
     if (developmentHost) origin = `http://${developmentHost}:3000`;
+  } else {
+    // The custom domain currently does not resolve from standalone builds;
+    // this verified deployment serves the public /products assets.
+    origin = productionOrigin;
   }
 
-  return new URL(path.startsWith('/') ? path : `/${path}`, `${origin.replace(/\/$/, '')}/`).toString();
+  const relativePath = path.startsWith('/') ? path : `/${path}`;
+  const productionPath = __DEV__ ? relativePath : relativePath.replace(/\+/g, '%2B');
+  return new URL(productionPath, `${origin.replace(/\/$/, '')}/`).toString();
 }

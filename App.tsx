@@ -1,5 +1,5 @@
 import 'react-native-url-polyfill/auto';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
@@ -33,6 +33,7 @@ export default function App() {
   const [cartLoading, setCartLoading] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const cartLoadGeneration = useRef(0);
 
   useEffect(() => {
     let mounted = true;
@@ -56,16 +57,18 @@ export default function App() {
   }, []);
 
   const refreshCart = useCallback(async () => {
-    if (!user) { setCart([]); return; }
+    const generation = ++cartLoadGeneration.current;
+    if (!user) { setCart([]); setCartLoading(false); setCartError(null); return; }
     setCartLoading(true);
     setCartError(null);
     try {
-      setCart(await loadCart(user.id));
+      const nextCart = await loadCart(user.id);
+      if (cartLoadGeneration.current === generation) setCart(nextCart);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to load your cart.';
-      setCartError(message);
+      if (cartLoadGeneration.current === generation) setCartError(message);
     } finally {
-      setCartLoading(false);
+      if (cartLoadGeneration.current === generation) setCartLoading(false);
     }
   }, [user]);
 
